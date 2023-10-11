@@ -2,9 +2,10 @@ from __future__ import print_function
 import j1939
 import logging
 import inspect
-import sys
 
 logger = logging.getLogger("j1939")
+
+RECV_TIMEOUT = 0.15
 #
 # for responding to seed/key requests provide your own keyGenerator
 # class..
@@ -17,12 +18,12 @@ try:
     import genkey
     security250 = genkey.GenKey(speed=250)
     security500 = genkey.GenKey(speed=500)
-    logger.info("Private Genkey Loaded")
+    logger.debug("Private Genkey Loaded")
 except:
     # Stuff in a fake genKey responder.  Pretty much just needs a
     # reference to any class that can convert a Seed to a Key..  For
     # obvious reasons I'm not posting mine
-    logger.warning("Genkey Not loaded, This one will generate garbage keys")
+    logger.debug("Genkey Not loaded, This one will generate garbage keys")
     class Genkey:
         def SeedToKey(self, seed):
             return 0x12345678
@@ -54,8 +55,10 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
     filt = [{'pgn':0xd800, 'source':dest},{'pgn':0xd400, 'source':dest}]
 
     if bus is None:
-        bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, keygen=keygetFunction, speed=speed, bitrate=(int(speed)*1000), broadcast=False, j1939_filters=filt)
+        bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, speed=speed, bitrate=(int(speed)*1000), keygen=keygetFunction, broadcast=False, j1939_filters=filt)
+        logger.debug(f"bus: {bus} channel: {channel} bustype: {bustype} keygen: {keygetFunction}")
         node = j1939.Node(bus, j1939.NodeName(), [src])
+        logger.debug(f"Node: {node} NodeName: {j1939.NodeName()}  src: {[src]}")
         bus.connect(node)
         close = True
 
@@ -66,16 +69,25 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
     dm14data = [length, 0x15, pLow, pMid, pHigh, extension, 0xff, 0xff]
 
     dm14pgn = j1939.PGN(pdu_format=0xd9, pdu_specific=dest)
+    logger.debug(f"dm14pgn: {dm14pgn}")
     dm14aid = j1939.ArbitrationID(pgn=dm14pgn, source_address=src, destination_address=dest)
+    logger.debug(f"dm14aid: {dm14aid}")
     dm14pdu = j1939.PDU(timestamp=0.0, arbitration_id=dm14aid, data=dm14data, info_strings=None)
+    logger.debug(f"dm14pdu: {dm14pdu}")
     dm14pdu.display_radix='hex'
 
+
     bus.send(dm14pdu)
+    logger.debug(f"dm14pdu: {dm14pdu}")
 
     sendBuffer = []
-    logger.info("---------------## length=%d, value=%s " % (length, value))
+    #sendBuffer.append(length)
+    #for i in range(0, length):
+    #    sendBuffer.append(0)
+
+    logger.debug("---------------## length=%d, value=%s " % (length, value))
     if isinstance(value, int) and length < 8:
-        logger.info("-----value")
+        logger.debug("-----value")
         if length < 8:
             sendBuffer.append(length)
             for i in range(0, length):
@@ -85,14 +97,14 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
 
     elif isinstance(value, list):
         # if sending a list use the exact list elements as the data
-        logger.info("-----list of {} byte(s)".format(len(value)))
+        logger.debug("-----list of {} byte(s)".format(len(value)))
         sendBuffer.append(len(value))
         for i in range(len(value)):
-            logger.info("---------------## b[{}]=0x{:02x}".format(i, value[i]))
+            logger.debug("---------------## b[{}]=0x{:02x}".format(i, value[i]))
             sendBuffer.append(value[i])
 
     elif isinstance(value, str):
-        logger.info("-----str, value={}, len(value)={}. length={}".format(value, len(value), length))
+        logger.debug("-----str, value={}, len(value)={}. length={}".format(value, len(value), length))
         assert(len(value) <= length)
         sendBuffer.append(length+1)
         for i in range(len(value)):
@@ -101,19 +113,19 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
     else:
         raise ValueError("Data type not supported.")
 
-    logger.info("---------------## sendBuffer=%s ", sendBuffer)
+    logger.debug("---------------## sendBuffer=%s ", sendBuffer)
 
     dm16pgn = j1939.PGN(pdu_format=0xd7, pdu_specific=dest)
     dm16aid = j1939.ArbitrationID(pgn=dm16pgn, source_address=src, destination_address=dest)
     dm16pdu = j1939.PDU(timestamp=0.0, arbitration_id=dm16aid, data=sendBuffer)
     dm16pdu.display_radix='hex'
 
-    logger.info("----------------## PDU=%s ", dm16pdu)
+    logger.debug("----------------## PDU=%s ", dm16pdu)
 
     # Wait around for a while looking for the second proceed
     while countdown:
         countdown -= 1
-        rcvPdu = bus.recv(timeout=0.25)
+        rcvPdu = bus.recv(timeout=RECV_TIMEOUT)
         if rcvPdu:
             rcvPdu.display_radix='hex'
             logger.debug("received PDU: %s", rcvPdu)
@@ -121,13 +133,13 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
                 if rcvPdu.data[0]==1 and rcvPdu.data[1]==0x11:
                     if rcvPdu.data[6] == 0xff and rcvPdu.data[7] == 0xff:
                         bus.send(dm16pdu)
-                        logger.info('Sent %s', dm16pdu)
+                        logger.debug('Sent %s', dm16pdu)
                 elif rcvPdu.data[0]==0 and rcvPdu.data[1]==0x19:
-                    logger.info("Value Sent")
+                    logger.debug("Value Sent")
                     result = 1
                     break
                 elif rcvPdu.data[0]==0 and rcvPdu.data[1]==0x1B:
-                    logger.info("Rejected")
+                    logger.debug("Rejected")
                     result = 0
                     break
     if close:
@@ -135,14 +147,28 @@ def set_mem_object(pointer, extension, value, channel='can0', bustype='socketcan
     return result
 
 def get_mem_object(pointer, extension, channel='can0', bustype='socketcan', length=4, src=0, dest=0x17, bus=None, speed=250, timeout=10):
-    logger.info("{}: begin".format(inspect.stack()[0][3]))
+    logger.debug("{}: begin".format(inspect.stack()[0][3]))
     countdown = timeout
     result = None
     close = False
 
+    keygetFunction = None
+
+    if int(speed) == 250:
+        keygetFunction = security250.SeedToKey
+        logger.debug("PI02f speed=500, keygetFunction={}".format(keygetFunction))
+    elif int(speed) == 500:
+        keygetFunction = security500.SeedToKey
+        logger.debug("PI02f speed=500, keygetFunction={}".format(keygetFunction))
+    else:
+        logger.debug("PI02f speed=Unknown, keygetFunction={}".format(keygetFunction))
+        pass
+
     if bus is None:
-        bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, speed=speed, bitrate=(int(speed)*1000), broadcast=False)
+        bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, speed=speed, bitrate=(int(speed)*1000), keygen=keygetFunction, broadcast=False)
+        print(f"bus: {bus} channel: {channel} bustype: {bustype} keygen: {keygetFunction}")
         node = j1939.Node(bus, j1939.NodeName(), [src])
+        print(f"Node: {node} NodeName: {j1939.NodeName()}  src: {[src]}")
         bus.connect(node)
         close = True
 
@@ -159,17 +185,17 @@ def get_mem_object(pointer, extension, channel='can0', bustype='socketcan', leng
     pdu = j1939.PDU(timestamp=0.0, arbitration_id=aid, data=data, info_strings=None)
     assert(pdu != None)
     pdu.display_radix='hex'
-    logger.info("{}: Sending Request PDU: {}".format(inspect.stack()[0][3], pdu))
+    logger.debug("{}: Sending Request PDU: {}".format(inspect.stack()[0][3], pdu))
     bus.send(pdu)
 
     #
     # Wait for the response
     #
     while countdown:
-        pdu = bus.recv(timeout=1)
+        pdu = bus.recv(timeout=RECV_TIMEOUT)
         if pdu is not None:
-            logger.info("{}: Received PDU: {}".format(inspect.stack()[0][3], pdu))
-            logger.info(pdu)
+            logger.debug("{}: Received PDU: {}".format(inspect.stack()[0][3], pdu))
+            logger.debug(pdu)
             if pdu.pgn == 0xd700:
                 value = list(pdu.data)
                 length = value[0]
@@ -182,23 +208,23 @@ def get_mem_object(pointer, extension, channel='can0', bustype='socketcan', leng
                 else:
                     result = value[1:]
 
-                #logger.info("{}: d700 received, result: {}/0x{:08x}".format(inspect.stack()[0][3], result, result))
+                #logger.debug("{}: d700 received, result: {}/0x{:08x}".format(inspect.stack()[0][3], result, result))
                 
                 break # got what I was waiting for
 
         countdown -= 1
 
     if close:
-        logger.info("{}: Closing Bus".format(inspect.stack()[0][3]))
+        logger.debug("{}: Closing Bus".format(inspect.stack()[0][3]))
         bus.shutdown()
 
     if result is None:
-        raise IOError(" no CAN response")
+        raise IOError("get_mem_object no CAN response!")
 
 
     return result
 
-def request_pgn(requested_pgn, channel='can0', speed=250, bustype='socketcan', length=4, src=0, dest=0x17, bus=None, timeout=10):
+def request_pgn(requested_pgn, speed=250, channel='can0', bustype='socketcan', length=4, src=0, dest=0x17, bus=None, timeout=10):
     countdown = timeout
     result = None
     close = False
@@ -211,7 +237,6 @@ def request_pgn(requested_pgn, channel='can0', speed=250, bustype='socketcan', l
 
     if not isinstance(requested_pgn, int):
         raise ValueError("pgn must be an integer.")
-
     if bus is None:
         bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, speed=speed, bitrate=(int(speed)*1000), keygen=keygetFunction, broadcast=False)
         node = j1939.Node(bus, j1939.NodeName(), [src])
@@ -234,7 +259,7 @@ def request_pgn(requested_pgn, channel='can0', speed=250, bustype='socketcan', l
     bus.send(pdu)
     maxPdu = 50
     while countdown:
-        pdu = bus.recv(timeout=1)
+        pdu = bus.recv(timeout=RECV_TIMEOUT)
         if pdu and (pdu.pgn == 0xe800 or pdu.pgn == requested_pgn):
             result = list(pdu.data) 
             break # got what I was waiting for
@@ -250,11 +275,11 @@ def request_pgn(requested_pgn, channel='can0', speed=250, bustype='socketcan', l
     if close:
         bus.shutdown()
     if not result:
-        raise IOError(" no CAN response")
+        raise IOError("request_pgn no CAN response")
     return result
 
 
-def send_pgn(requested_pgn, data, channel='can0', speed=250, bustype='socketcan', length=4, src=0, dest=0x17, bus=None, timeout=10):
+def send_pgn(requested_pgn, data, speed=250, channel='can0', bustype='socketcan', length=4, src=0, dest=0x17, bus=None, timeout=10):
     countdown = timeout
     result = None
     close = False
@@ -268,7 +293,7 @@ def send_pgn(requested_pgn, data, channel='can0', speed=250, bustype='socketcan'
     if not isinstance(requested_pgn, int):
         raise ValueError("pgn must be an integer.")
     if bus is None:
-        bus = j1939.Bus(channel=channel, bustype=bustype, speed=speed, bitrate=(int(speed)*1000), timeout=0.01, keygen=keygetFunction)
+        bus = j1939.Bus(channel=channel, bustype=bustype, timeout=0.01, speed=speed, bitrate=(int(speed)*1000),  keygen=keygetFunction)
         close = True
         
     pgn = j1939.PGN()
@@ -277,7 +302,7 @@ def send_pgn(requested_pgn, data, channel='can0', speed=250, bustype='socketcan'
     pgn.value = requested_pgn#0xea00 + dest # request_pgn mem-object
     aid = j1939.ArbitrationID(pgn=pgn, source_address=src, destination_address=dest)
 
-    logger.info(data)
+    logger.debug(data)
     pdu = j1939.PDU(timestamp=0.0, arbitration_id=aid, data=data, info_strings=None)
 
     pdu.display_radix='hex'
@@ -287,13 +312,13 @@ def send_pgn(requested_pgn, data, channel='can0', speed=250, bustype='socketcan'
         bus.shutdown()
     if 0: #leaving in miller's if 0
         while countdown:
-            pdu = bus.recv(timeout=1)
+            pdu = bus.recv(timeout=RECV_TIMEOUT)
             if pdu and (pdu.pgn == 0xe800 or pdu.pgn == requested_pgn):
                 result = list(pdu.data)
                 break # got what I was waiting for
             if pdu:
                 countdown -= 1
         if not result:
-            raise IOError(" no CAN response")
+            raise IOError("send_pgn no CAN response")
         return result
 

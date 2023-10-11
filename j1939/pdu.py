@@ -111,7 +111,7 @@ class PDU(object):
             for element in value:
                 if isinstance(element, str):
                     element = int(element)
-                #logger.warn("!!! element=%s type(element)=%s" % (element, type(element)))
+                logging.debug("!!! element=%s type(element)=%s" % (element, type(element)))
                 assert element >= 0, 'Data values must be between 0 and 255, element={}'.format(element)
                 assert element <= 255, 'Data values must be between 0 and 255'
         return value
@@ -128,20 +128,20 @@ class PDU(object):
         :param list[str] fields:
         """
 
-        logger.debug("check_equality starting")
+        logging.debug("check_equality starting")
 
         retval = True
         for field in fields:
             try:
                 own_value = getattr(self, field)
             except AttributeError:
-                logger.warning("'%s' not found in 'self'" % field)
+                logging.debug("'%s' not found in 'self'" % field)
                 return False
 
             try:
                 other_value = getattr(other, field)
             except AttributeError:
-                logger.debug("'%s' not found in 'other'" % field)
+                logging.debug("'%s' not found in 'other'" % field)
                 return False
 
             if debug:
@@ -149,7 +149,7 @@ class PDU(object):
             if own_value != other_value:
                 return False
 
-        logger.debug("Messages match")
+        logging.debug("Messages match")
         return retval
 
     @property
@@ -175,7 +175,7 @@ class PDU(object):
         :return: A string representation of this message.
 
         """
-        logger.debug("PI07: stringify PDU")
+        logging.debug("PI07: stringify PDU")
 
         if self.radix == RADIX_HEX:
             data_string = " ".join("{:02x}".format(byte) for byte in self.data)

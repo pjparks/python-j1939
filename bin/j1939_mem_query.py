@@ -88,8 +88,8 @@ if __name__ == "__main__":
     logger = logging.getLogger("j1939")
     logger.setLevel(numeric_level)
 
-    logger = logging.getLogger("can")
-    logger.setLevel(numeric_level)
+    # logger = logging.getLogger("can")
+    # logger.setLevel(numeric_level)
 
     if (args.pointer==None or args.extension==None):
         raise ValueError("pointer and extension are required!")
@@ -102,10 +102,10 @@ if __name__ == "__main__":
     speed = int(args.speed, 0)
     channel = args.channel
     bustype = args.bustype
-    logging.info ("get_mem_object_single(src=0x%02x, dest=0x%02x, pointer=0x%02x, extension/space=0x%02x, len=%d" % (source, dest, ptr, ext, length))
+    logging.debug("---->>>get_mem_object_single(src=0x%02x, dest=0x%02x, pointer=0x%02x, extension/space=0x%02x, len=%d)" % (source, dest, ptr, ext, length))
 
     val = j1939.utils.get_mem_object(ptr, ext, length=length, src=source, dest=dest, channel=channel, bustype=bustype, speed=speed)
-    print("{}".format(val))
+    logging.debug("{}".format(val))
     out = ''
     if isinstance(val, list):
             for x in val:

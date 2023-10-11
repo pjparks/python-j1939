@@ -62,7 +62,7 @@ class CanNotifier(canNotifier):
                         for callback in self.listeners:
                             callback(msg)
                 msg = bus.recv(self.timeout)
-                logger.debug('CanNotifier: {}\n'.format(msg))
+                logging.debug('CanNotifier: message: {}\n'.format(msg))
 
         # 
         # The next two handlers are intended to mask race conditions that can occur when 

@@ -28,7 +28,7 @@ class ArbitrationID(object):
         self.priority = priority
         self.destination_address_value = None
 
-        logger.debug("ArbitrationID:__init__: self._pgn=%s, type %s" % (pgn, type(pgn)))
+        logging.debug("ArbitrationID:__init__: self._pgn=%s, type %s" % (pgn, type(pgn)))
 
         if pgn is None:
             self._pgn = PGN()
@@ -42,7 +42,7 @@ class ArbitrationID(object):
 
         #self.pgn = pgn
 
-        logger.debug("ArbitrationID:__init__: self._pgn=%s, type %s" % (self._pgn, type(self._pgn)))
+        logging.debug("ArbitrationID:__init__: self._pgn=%s, type %s" % (self._pgn, type(self._pgn)))
         if self._pgn:
             if self._pgn.is_destination_specific:
                 if destination_address is None:
@@ -51,7 +51,7 @@ class ArbitrationID(object):
                     if destination_address >= 0 and destination_address <= 255:
                         self.destination_address_value = destination_address
                         if  self.destination_address_value != self._pgn.pdu_specific:
-                                logger.debug("self._pgn=%s, self.destination_address_value = %x, pgn.pdu_specific = %x" %
+                                logging.debug("self._pgn=%s, self.destination_address_value = %x, pgn.pdu_specific = %x" %
                                         (self._pgn, self.destination_address_value, self._pgn.pdu_specific))
 #                        assert( self.destination_address_value == pgn.pdu_specific)
                     else:
@@ -138,7 +138,7 @@ class ArbitrationID(object):
             self._pgn = other
 
     def __str__(self):
-        logger.debug("arbitrationid.__str__: ids:%d, pri:%s, pgn:%s, dest:%s, src:%s, ids:%d" %
+        logging.debug("arbitrationid.__str__: ids:%d, pri:%s, pgn:%s, dest:%s, src:%s, ids:%d" %
                 (self._pgn.is_destination_specific, self.priority, self._pgn, self.destination_address_value, self.source_address, self._pgn.is_destination_specific))
 
         if self._pgn.is_destination_specific:

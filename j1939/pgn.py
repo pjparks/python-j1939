@@ -14,10 +14,10 @@ class PGN(object):
     @property
     def is_pdu1(self):
         result =  (((self.pdu_format & 0xFF) < 240) or self.reserved_flag)
-        logger.debug("PGN is_pdu1 {:04x}: {}".format(self.pdu_format, result))
-        logger.debug("            (self.pdu_format & 0xFF) < 240 {:04x}: {}".format(self.pdu_format, (self.pdu_format & 0xFF) < 240))
-        logger.debug("            self.reserved_flag {:04x}: {}".format(self.pdu_format, self.reserved_flag))
-        logger.debug("            self.data_page_flag {:04x}: {}".format(self.pdu_format, self.data_page_flag))
+        logging.debug("PGN is_pdu1 {:04x}: {}".format(self.pdu_format, result))
+        logging.debug("            (self.pdu_format & 0xFF) < 240 {:04x}: {}".format(self.pdu_format, (self.pdu_format & 0xFF) < 240))
+        logging.debug("            self.reserved_flag {:04x}: {}".format(self.pdu_format, self.reserved_flag))
+        logging.debug("            self.data_page_flag {:04x}: {}".format(self.pdu_format, self.data_page_flag))
         return result
 
     @property
@@ -27,7 +27,7 @@ class PGN(object):
     @property
     def is_destination_specific(self):
         result = self.is_pdu1
-        logger.debug(f"PGN is_destination_specific {self.value:04x}: {result}")
+        logging.debug(f"PGN is_destination_specific {self.value:04x}: {result}")
         return result
 
     @property
@@ -37,7 +37,7 @@ class PGN(object):
 		# Be sure to truncate the PGN at 18 bits
 		#
         result = int("%.2x%.2x%.2x" % (_pgn_flags_byte & 0x03, self.pdu_format, self.pdu_specific), 16)
-        logger.debug(f"value-result = {result:06x}")
+        logging.debug(f"value-result = {result:06x}")
         return result
 
     @value.setter
@@ -46,11 +46,11 @@ class PGN(object):
         self.data_page_flag = (value & 0x010000) >> 16
         self.pdu_format = (value & 0x00FF00) >> 8
         self.pdu_specific = value & 0x0000FF
-        #MIL logger.debug("PGN.@valueSetter, value=0x%08x, pdu_format=0x%08x" % (value, self.pdu_format))
+        logging.debug("PGN.@valueSetter, value=0x%08x, pdu_format=0x%08x" % (value, self.pdu_format))
 
     @staticmethod
     def from_value(pgn_value):
-        logger.debug("PGN.@from_value, pgn_value=0x%08x" % (pgn_value))
+        logging.debug("PGN.@from_value, pgn_value=0x%08x" % (pgn_value))
         pgn = PGN()
         pgn.reserved_flag = (pgn_value & 0x020000) >> 17
         pgn.data_page_flag = (pgn_value & 0x010000) >> 16
